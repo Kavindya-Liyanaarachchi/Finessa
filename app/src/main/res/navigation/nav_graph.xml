@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_home">
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="com.example.finessa.ui.main.HomeFragment"
+        android:label="Home" />
+    <fragment
+        android:id="@+id/nav_analysis"
+        android:name="com.example.finessa.ui.analysis.AnalysisFragment"
+        android:label="Analysis" />
+    <fragment
+        android:id="@+id/nav_budget"
+        android:name="com.example.finessa.ui.budget.BudgetFragment"
+        android:label="Budget" />
+    <fragment
+        android:id="@+id/nav_add_transaction"
+        android:name="com.example.finessa.ui.transaction.AddTransactionFragment"
+        android:label="Add Transaction" />
+</navigation>
