@@ -16,11 +16,19 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.util.Date
 
-class TransactionDialogFragment(
-    private val isIncome: Boolean,
-    private val onSave: (Transaction) -> Unit,
-    private val existingTransaction: Transaction? = null
-) : DialogFragment() {
+class TransactionDialogFragment : DialogFragment() {
+    private var existingTransaction: Transaction? = null
+    private var onSave: ((Transaction) -> Unit)? = null
+    var isIncome = false  // Make this public
+
+    fun setTransaction(transaction: Transaction) {
+        existingTransaction = transaction
+        isIncome = transaction.isIncome
+    }
+
+    fun setOnSaveListener(listener: (Transaction) -> Unit) {
+        onSave = listener
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -41,8 +49,12 @@ class TransactionDialogFragment(
         val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancel)
         val btnSave = view.findViewById<MaterialButton>(R.id.btnSave)
 
-        // Setup category dropdown
-        val categories = resources.getStringArray(R.array.categories)
+        // Setup category dropdown based on transaction type
+        val categories = if (isIncome) {
+            resources.getStringArray(R.array.income_categories)
+        } else {
+            resources.getStringArray(R.array.expense_categories)
+        }
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, categories)
         actvCategory.setAdapter(adapter)
 
@@ -69,18 +81,24 @@ class TransactionDialogFragment(
                 return@setOnClickListener
             }
 
-            val transaction = Transaction(
-                id = existingTransaction?.id ?: System.currentTimeMillis().toInt(),
+            val transaction = existingTransaction?.copy(
                 title = title,
                 amount = amount,
                 category = category,
-                date = existingTransaction?.date ?: Date(),
+                description = description,
+                recurring = recurring
+            ) ?: Transaction(
+                id = 0,
+                title = title,
+                amount = amount,
+                category = category,
+                date = Date(),
                 isIncome = isIncome,
                 description = description,
                 recurring = recurring
             )
 
-            onSave(transaction)
+            onSave?.invoke(transaction)
             dismiss()
         }
     }

@@ -1,9 +1,34 @@
 <resources>
-    <string-array name="categories">
-        <item>Food</item>
-        <item>Transport</item>
-        <item>Bills</item>
+    <string-array name="expense_categories">
+        <item>Food &amp; Groceries</item>
+        <item>Dining Out</item>
+        <item>Transportation</item>
+        <item>Rent &amp; Mortgage</item>
+        <item>Utilities</item>
+        <item>Healthcare</item>
         <item>Entertainment</item>
+        <item>Shopping</item>
+        <item>Education</item>
+        <item>Personal Care</item>
+        <item>Travel</item>
+        <item>Insurance</item>
+        <item>Debt Payments</item>
+        <item>Gifts &amp; Donations</item>
+        <item>Home Maintenance</item>
+        <item>Pet Care</item>
+        <item>Child Care</item>
+        <item>Taxes</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="income_categories">
+        <item>Business</item>
+        <item>Freelance</item>
+        <item>Job</item>
+        <item>Sales</item>
+        <item>Bank Interest</item>
+        <item>Invesments</item>
+        <item>Rental income</item>
         <item>Other</item>
     </string-array>
 </resources>

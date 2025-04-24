@@ -20,12 +20,12 @@
         android:id="@+id/tvIconDescription"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:gravity="center"
-        android:text="Smart Finance Management"
+        android:text="Your personal finance companion"
         android:textColor="?attr/colorPrimary"
-        android:textSize="18sp"
-        android:textStyle="bold"
+        android:textSize="16sp"
+        android:textStyle="italic"
         app:layout_constraintBottom_toTopOf="@id/tvTitle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -43,7 +43,7 @@
         app:layout_constraintBottom_toTopOf="@id/tvDescription"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/ivOnboarding" />
+        app:layout_constraintTop_toBottomOf="@id/tvIconDescription" />
 
     <TextView
         android:id="@+id/tvDescription"

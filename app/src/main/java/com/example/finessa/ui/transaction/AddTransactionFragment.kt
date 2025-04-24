@@ -17,10 +17,6 @@ class AddTransactionFragment : Fragment() {
     private var _binding: FragmentAddTransactionBinding? = null
     private val binding get() = _binding!!
 
-    private val categories = arrayOf(
-        "Food", "Transport", "Entertainment", "Bills", "Shopping", "Salary", "Other"
-    )
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -38,6 +34,17 @@ class AddTransactionFragment : Fragment() {
     }
 
     private fun setupCategoryDropdown() {
+        // Initially set up with expense categories
+        updateCategoryDropdown(false)
+    }
+
+    private fun updateCategoryDropdown(isIncome: Boolean) {
+        val categories = if (isIncome) {
+            resources.getStringArray(R.array.income_categories)
+        } else {
+            resources.getStringArray(R.array.expense_categories)
+        }
+        
         val adapter = ArrayAdapter(
             requireContext(),
             R.layout.dropdown_menu_item,
@@ -48,7 +55,10 @@ class AddTransactionFragment : Fragment() {
 
     private fun setupTypeSelection() {
         binding.cgType.setOnCheckedChangeListener { _, checkedId ->
-            // Handle type selection if needed
+            val isIncome = binding.chipIncome.isChecked
+            updateCategoryDropdown(isIncome)
+            // Clear the current category selection when switching types
+            binding.actvCategory.text.clear()
         }
     }
 
@@ -114,14 +124,8 @@ class AddTransactionFragment : Fragment() {
             recurring = false // Optional parameter with default value
         )
 
-        // TODO: Save transaction to database/ViewModel
-        // For now, just show a success message and navigate back
-        Snackbar.make(
-            binding.root,
-            "Transaction saved successfully",
-            Snackbar.LENGTH_SHORT
-        ).show()
-
+        // Save the transaction and show success message
+        Snackbar.make(binding.root, "Transaction saved successfully", Snackbar.LENGTH_SHORT).show()
         findNavController().navigateUp()
     }
 

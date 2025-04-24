@@ -110,34 +110,36 @@ class HomeFragment : Fragment() {
     }
 
     private fun showTransactionDialog(isIncome: Boolean, existingTransaction: Transaction? = null) {
-        TransactionDialogFragment(
-            isIncome = isIncome,
-            onSave = { transaction ->
-                val transactions = adapter.transactionsList.toMutableList()
-                
-                if (!isIncome) {
-                    if (!validateBudgets(transaction, transactions)) {
-                        return@TransactionDialogFragment
-                    }
+        val dialog = TransactionDialogFragment()
+        dialog.isIncome = isIncome  // Set the isIncome flag
+        if (existingTransaction != null) {
+            dialog.setTransaction(existingTransaction)
+        }
+        dialog.setOnSaveListener { transaction ->
+            val transactions = adapter.transactionsList.toMutableList()
+            
+            if (!isIncome) {
+                if (!validateBudgets(transaction, transactions)) {
+                    return@setOnSaveListener
                 }
+            }
 
-                if (existingTransaction != null) {
-                    val index = transactions.indexOfFirst { it.id == existingTransaction.id }
-                    if (index != -1) {
-                        transactions[index] = transaction
-                        showSnackbar("Transaction updated successfully")
-                    }
-                } else {
-                    transactions.add(0, transaction)
-                    showSnackbar("Transaction added successfully")
+            if (existingTransaction != null) {
+                val index = transactions.indexOfFirst { it.id == existingTransaction.id }
+                if (index != -1) {
+                    transactions[index] = transaction
+                    showSnackbar("Transaction updated successfully")
                 }
-                adapter.updateTransactions(transactions)
-                updateBalance(transactions)
-                updateBudgetStatus()
-                saveData(transactions)
-            },
-            existingTransaction = existingTransaction
-        ).show(childFragmentManager, "transaction_dialog")
+            } else {
+                transactions.add(transaction)
+                showSnackbar("Transaction added successfully")
+            }
+
+            adapter.updateTransactions(transactions)
+            saveData(transactions)
+            updateBudgetStatus()
+        }
+        dialog.show(childFragmentManager, "transaction_dialog")
     }
 
     private fun validateBudgets(newTransaction: Transaction, transactions: List<Transaction>): Boolean {
@@ -149,8 +151,6 @@ class HomeFragment : Fragment() {
             if (newTotal > monthlyBudget) {
                 showBudgetLimitBlockedNotification(newTotal, monthlyBudget.toDouble(), "Monthly")
                 return false
-            } else if (newTotal > monthlyBudget * 0.8) {
-                showApproachingBudgetNotification(newTotal, monthlyBudget.toDouble(), "Monthly", ((newTotal / monthlyBudget) * 100).toInt())
             }
         }
 
@@ -162,8 +162,6 @@ class HomeFragment : Fragment() {
             if (newWeeklyTotal > weeklyBudget) {
                 showBudgetLimitBlockedNotification(newWeeklyTotal, weeklyBudget.toDouble(), "Weekly")
                 return false
-            } else if (newWeeklyTotal > weeklyBudget * 0.8) {
-                showApproachingBudgetNotification(newWeeklyTotal, weeklyBudget.toDouble(), "Weekly", ((newWeeklyTotal / weeklyBudget) * 100).toInt())
             }
         }
 
@@ -178,8 +176,6 @@ class HomeFragment : Fragment() {
                 if (newCategoryTotal > categoryBudget) {
                     showBudgetLimitBlockedNotification(newCategoryTotal, categoryBudget, newTransaction.category)
                     return false
-                } else if (newCategoryTotal > categoryBudget * 0.8) {
-                    showApproachingBudgetNotification(newCategoryTotal, categoryBudget, newTransaction.category, ((newCategoryTotal / categoryBudget) * 100).toInt())
                 }
             }
         }
@@ -234,18 +230,38 @@ class HomeFragment : Fragment() {
         val monthlyBudget = sharedPreferences.getFloat("monthly_budget", 0f)
         if (monthlyBudget > 0) {
             val currentExpenses = getCurrentMonthExpenses(adapter.transactionsList)
+            val remainingBudget = monthlyBudget.toDouble() - currentExpenses
             val percentage = (currentExpenses / monthlyBudget.toDouble() * 100).toInt()
             
             progressBudget.progress = percentage
-            tvBudgetStatus.text = "Monthly Budget: $${String.format("%.2f", currentExpenses)} / $${String.format("%.2f", monthlyBudget)} (${percentage}%)"
+            tvBudgetStatus.text = buildString {
+                append("Monthly Budget Status:\n")
+                append("Spent: $${String.format("%.2f", currentExpenses)}\n")
+                append("Budget: $${String.format("%.2f", monthlyBudget)}\n")
+                append("Remaining: $${String.format("%.2f", remainingBudget)}\n")
+                append("(${percentage}% used)")
+            }
             
-            cardBudgetStatus.setCardBackgroundColor(
-                ContextCompat.getColor(requireContext(), when {
-                    percentage >= 100 -> R.color.error_light
-                    percentage >= 80 -> R.color.warning_light
-                    else -> R.color.success_light
-                })
-            )
+            // Update card color based on budget status
+            val cardColor = when {
+                percentage >= 100 -> R.color.error_light
+                percentage >= 80 -> R.color.warning_light
+                else -> R.color.success_light
+            }
+            cardBudgetStatus.setCardBackgroundColor(ContextCompat.getColor(requireContext(), cardColor))
+
+            // Show warning if approaching limit (80% or more)
+            if (percentage >= 80 && percentage < 100) {
+                showSnackbar("Warning: You've used ${percentage}% of your monthly budget!")
+            }
+            // Show alert if exceeded (100% or more)
+            else if (percentage >= 100) {
+                showSnackbar("Alert: You've exceeded your monthly budget!")
+            }
+        } else {
+            tvBudgetStatus.text = "Set a monthly budget in the Budget tab to track your spending"
+            cardBudgetStatus.setCardBackgroundColor(ContextCompat.getColor(requireContext(), R.color.surface))
+            progressBudget.progress = 0
         }
     }
 
@@ -257,7 +273,7 @@ class HomeFragment : Fragment() {
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            showBudgetLimitBlockedDialog(currentAmount, budgetLimit, budgetType)
+            showBudgetLimitMessage(currentAmount, budgetLimit, budgetType)
             return
         }
 
@@ -267,33 +283,28 @@ class HomeFragment : Fragment() {
         }
         val budgetPendingIntent = PendingIntent.getActivity(
             requireContext(),
-            1, // Unique request code
+            1,
             budgetIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Intent to open the app
-        val appIntent = requireActivity().packageManager.getLaunchIntentForPackage(requireActivity().packageName)
-        val appPendingIntent = PendingIntent.getActivity(
-            requireContext(),
-            0, 
-            appIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        
         val percentage = (currentAmount / budgetLimit * 100).toInt()
         val overAmount = currentAmount - budgetLimit
 
         val notification = NotificationCompat.Builder(requireContext(), CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_baseline_warning_24)
-            .setContentTitle("Transaction Blocked: $budgetType Budget Exceeded")
-            .setContentText("Exceeded by $${String.format("%.2f", overAmount)} (${percentage}% used). Limit: $${String.format("%.2f", budgetLimit)}")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ERROR)
+            .setContentTitle("Budget Limit Message")
+            .setContentText("$budgetType budget limit exceeded by $${String.format("%.2f", overAmount)}")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("Your $budgetType budget has been exceeded by $${String.format("%.2f", overAmount)}.\n\n" +
+                        "Current spending: $${String.format("%.2f", currentAmount)}\n" +
+                        "Budget limit: $${String.format("%.2f", budgetLimit)}\n" +
+                        "Percentage used: ${percentage}%"))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
-            .setContentIntent(appPendingIntent) // Opens app on tap
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(R.drawable.ic_baseline_settings_24, "View Budget", budgetPendingIntent) // Add action button
+            .setContentIntent(budgetPendingIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .build()
 
         val notificationManager = ContextCompat.getSystemService(
@@ -302,25 +313,29 @@ class HomeFragment : Fragment() {
         ) as NotificationManager
 
         notificationManager.notify(NOTIFICATION_ID + budgetType.hashCode() + 2000, notification)
-        showBudgetLimitBlockedDialog(currentAmount, budgetLimit, budgetType)
+        showBudgetLimitMessage(currentAmount, budgetLimit, budgetType)
     }
 
-    private fun showBudgetLimitBlockedDialog(currentAmount: Double, budgetLimit: Double, budgetType: String) {
+    private fun showBudgetLimitMessage(currentAmount: Double, budgetLimit: Double, budgetType: String) {
         val overAmount = currentAmount - budgetLimit
         val percentage = (currentAmount / budgetLimit * 100).toInt()
 
-        MaterialAlertDialogBuilder(requireContext(), R.style.MaterialAlertDialog_Rounded)
-            .setTitle("Budget Limit Exceeded!")
-            .setMessage("You have exceeded your $budgetType budget by $${String.format("%.2f", overAmount)}.\n\n" +
-                    "Current spending: $${String.format("%.2f", currentAmount)}\n" +
-                    "Budget limit: $${String.format("%.2f", budgetLimit)}\n" +
-                    "Percentage used: ${percentage}%\n\n" +
-                    "Please adjust your spending or increase your budget limit.")
-            .setIcon(R.drawable.ic_baseline_warning_24)
+        val message = buildString {
+            append("Budget Limit Message\n\n")
+            append("Your $budgetType budget has been exceeded by $${String.format("%.2f", overAmount)}.\n\n")
+            append("Current spending: $${String.format("%.2f", currentAmount)}\n")
+            append("Budget limit: $${String.format("%.2f", budgetLimit)}\n")
+            append("Percentage used: ${percentage}%\n\n")
+            append("Would you like to review your budget?")
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Budget Limit Message")
+            .setMessage(message)
             .setPositiveButton("View Budget") { _, _ ->
                 findNavController().navigate(R.id.nav_budget)
             }
-            .setNegativeButton("Dismiss", null)
+            .setNegativeButton("Later", null)
             .show()
     }
 
@@ -341,7 +356,7 @@ class HomeFragment : Fragment() {
         }
         val budgetPendingIntent = PendingIntent.getActivity(
             requireContext(),
-            1, // Unique request code
+            1,
             budgetIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -357,14 +372,20 @@ class HomeFragment : Fragment() {
 
         val notification = NotificationCompat.Builder(requireContext(), CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_baseline_warning_24)
-            .setContentTitle("Approaching $budgetType Budget Limit")
-            .setContentText("You've used ${percentage}% of your $budgetType budget ($${String.format("%.2f", currentAmount)} / $${String.format("%.2f", budgetLimit)})")
+            .setContentTitle("⚠️ Approaching Budget Limit")
+            .setContentText("You've used ${percentage}% of your $budgetType budget")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("You've used ${percentage}% of your $budgetType budget\n\n" +
+                        "Current spending: $${String.format("%.2f", currentAmount)}\n" +
+                        "Budget limit: $${String.format("%.2f", budgetLimit)}\n\n" +
+                        "Tap to view and manage your budget."))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
-            .setContentIntent(appPendingIntent) // Opens app on tap
+            .setContentIntent(appPendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(R.drawable.ic_baseline_settings_24, "View Budget", budgetPendingIntent) // Add action button
+            .addAction(R.drawable.ic_baseline_settings_24, "View Budget", budgetPendingIntent)
+            .setColor(ContextCompat.getColor(requireContext(), R.color.warning))
             .build()
 
         val notificationManager = ContextCompat.getSystemService(
